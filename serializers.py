@@ -1,6 +1,9 @@
 from rest_framework import serializers
+from rest_framework.fields import empty
 from rest_framework.validators import ValidationError
 import jsonschema
+from django.contrib.contenttypes.models import ContentType
+from djson.models import ModelType
 
 class JsonSchemaValidator:
     """
@@ -21,10 +24,12 @@ class JsonSchemaValidator:
         # Determine the underlying model field name. This may not be the
         # same as the serializer field name if `source=<>` is set.
         self.field_name = serializer_field.source_attrs[-1]
+        self.field = serializer_field
+        self.serializer = serializer_field.parent
         # Determine the existing instance, if this is an update operation.
         self.instance = getattr(serializer_field.parent, 'instance', None)
         if self.get_schema_func:
-            self.schema = self.get_schema_func(self.instance, self.field_name)
+            self.schema = self.get_schema_func(self)
 
     def __call__(self, value, serializer_field):
         self.set_context(serializer_field=serializer_field)
@@ -44,3 +49,29 @@ class JSONSchemaField(serializers.JSONField):
         validators = kwargs.pop('validators', [])
         validators.append(JsonSchemaValidator(self.schema, get_schema_func=self.get_schema_func))
         super().__init__(*args, validators=validators, **kwargs)
+
+def get_schema_func(validator):
+    # raise Exception('get_schema_func', validator.serializer.initial_data)
+    if validator.instance:
+        return validator.instance.type.schema
+    type_id = validator.serializer.initial_data.get('type')
+    if type_id:
+        model_type = ModelType.objects.filter(id=type_id).first()
+        if model_type:
+            return model_type.schema
+
+class DjsonTypeModelSerializer(serializers.ModelSerializer):
+    def __init__(self, instance=None, data=..., **kwargs):
+        self.fields['type'].choices = ModelType.get_model_choices(self.Meta.model)#self.get_type_choices()#ModelType.objects.all()#.filter(content_type=ContentType.objects.get_for_model(self.Meta.model))
+        # raise Exception('wtf', ModelType.objects.all(),  self.fields['type'].choices)
+        # raise Exception(self.Meta.model, self.fields['type'].choices)
+        super().__init__(instance, data, **kwargs)
+    # data = JSONSchemaField(schema=TEST_SCHEMA, required=True)
+    type = serializers.ChoiceField(choices=[])
+    data = JSONSchemaField(required=True, get_schema_func=get_schema_func)
+    # def get_type_choices(self):
+    #      return [(mt.id, mt.name) for mt in ModelType.objects.filter(content_type=ContentType.objects.get_for_model(self.Meta.model))]
+    # data = serializers.JSONField(required=False, validators=[JsonSchemaValidator(schema='sdflsdf')])
+    # class Meta:
+    #     model = Machine
+    #     exclude = []

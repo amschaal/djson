@@ -1,9 +1,24 @@
+from django.conf import settings
+from django.utils.module_loading import import_string
 from rest_framework import serializers
 from rest_framework.fields import empty
 from rest_framework.validators import ValidationError
 import jsonschema
 from django.contrib.contenttypes.models import ContentType
 from djson.models import ModelType
+from djson.validation import get_validator_error_tree
+
+def get_validator(schema):
+    if hasattr(settings, 'DJSON_GET_VALIDATOR'):
+        return import_string(settings.DJSON_GET_VALIDATOR)(schema)
+    else:
+        return jsonschema.Draft7Validator(schema)
+
+def get_errors(validator, data):
+    if hasattr(settings, 'DJSON_GET_ERRORS'):
+        return import_string(settings.DJSON_GET_ERRORS)(validator, data)
+    else:
+        return get_validator_error_tree(validator, data)
 
 class JsonSchemaValidator:
     """
@@ -35,11 +50,14 @@ class JsonSchemaValidator:
         self.set_context(serializer_field=serializer_field)
         schema = self.schema
         if schema:
-            validator = jsonschema.Draft7Validator(schema)
-            errors = validator.iter_errors(value)
-            error_messages = [str(e) for e in errors]
-            if error_messages:
-                raise ValidationError(', '.join(error_messages), code='json_schema')
+            validator = get_validator(schema)#jsonschema.Draft7Validator(schema)
+            # errors = validator.iter_errors(value)
+            tree = get_errors(validator, value)
+            if tree:
+                raise ValidationError(tree, code='json_schema')
+            # error_messages = [str(e) for e in errors]
+            # if error_messages:
+            #     raise ValidationError(', '.join(error_messages), code='json_schema')
 
 class JSONSchemaField(serializers.JSONField):
     # default_validators = [validate_json]
@@ -61,13 +79,14 @@ def get_schema_func(validator):
             return model_type.schema
 
 class DjsonTypeModelSerializer(serializers.ModelSerializer):
-    def __init__(self, instance=None, data=..., **kwargs):
-        self.fields['type'].choices = ModelType.get_model_choices(self.Meta.model)#self.get_type_choices()#ModelType.objects.all()#.filter(content_type=ContentType.objects.get_for_model(self.Meta.model))
+    def __init__(self, instance=None, **kwargs):
+        # self.fields['type'].queryset =  ModelType.get_model_queryset(self.Meta.model)#self.get_type_choices()#ModelType.objects.all()#.filter(content_type=ContentType.objects.get_for_model(self.Meta.model))
         # raise Exception('wtf', ModelType.objects.all(),  self.fields['type'].choices)
         # raise Exception(self.Meta.model, self.fields['type'].choices)
-        super().__init__(instance, data, **kwargs)
+        super().__init__(instance, **kwargs)
     # data = JSONSchemaField(schema=TEST_SCHEMA, required=True)
-    type = serializers.ChoiceField(choices=[])
+    # type = serializers.ChoiceField(choices=[])
+    type = serializers.PrimaryKeyRelatedField(queryset=ModelType.objects.all())
     data = JSONSchemaField(required=True, get_schema_func=get_schema_func)
     # def get_type_choices(self):
     #      return [(mt.id, mt.name) for mt in ModelType.objects.filter(content_type=ContentType.objects.get_for_model(self.Meta.model))]

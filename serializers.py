@@ -8,9 +8,9 @@ from django.contrib.contenttypes.models import ContentType
 from djson.models import ModelType
 from djson.validation import get_validator_error_tree
 
-def get_validator(schema):
+def get_validator(schema, data):
     if hasattr(settings, 'DJSON_GET_VALIDATOR'):
-        return import_string(settings.DJSON_GET_VALIDATOR)(schema)
+        return import_string(settings.DJSON_GET_VALIDATOR)(schema, data=data)
     else:
         return jsonschema.Draft7Validator(schema)
 
@@ -45,12 +45,13 @@ class JsonSchemaValidator:
         self.instance = getattr(serializer_field.parent, 'instance', None)
         if self.get_schema_func:
             self.schema = self.get_schema_func(self)
+        serializer_field.parent._schema = self.schema
 
     def __call__(self, value, serializer_field):
         self.set_context(serializer_field=serializer_field)
         schema = self.schema
         if schema:
-            validator = get_validator(schema)#jsonschema.Draft7Validator(schema)
+            validator = get_validator(schema, value)#jsonschema.Draft7Validator(schema)
             # errors = validator.iter_errors(value)
             tree = get_errors(validator, value)
             if tree:
@@ -71,6 +72,8 @@ class JSONSchemaField(serializers.JSONField):
 def get_schema_func(validator):
     # raise Exception('get_schema_func', validator.serializer.initial_data)
     if validator.instance:
+        if hasattr(validator.instance, 'schema') and validator.instance.schema:
+            return validator.instance.schema
         return validator.instance.type.schema
     type_id = validator.serializer.initial_data.get('type')
     if type_id:
@@ -84,6 +87,18 @@ class DjsonTypeModelSerializer(serializers.ModelSerializer):
         # raise Exception('wtf', ModelType.objects.all(),  self.fields['type'].choices)
         # raise Exception(self.Meta.model, self.fields['type'].choices)
         super().__init__(instance, **kwargs)
+    def to_internal_value(self, data):
+        _data = super().to_internal_value(data)
+        if getattr(self,'_schema') and (not self.instance or not self.instance.schema):
+            _data['schema'] = self._schema
+        return _data
+    def validate_type(self, value):
+        """
+        Type should not be changed once set.
+        """
+        if self.instance and value != self.instance.type:
+            raise serializers.ValidationError("Types cannot be changed.")
+        return value
     # data = JSONSchemaField(schema=TEST_SCHEMA, required=True)
     # type = serializers.ChoiceField(choices=[])
     type = serializers.PrimaryKeyRelatedField(queryset=ModelType.objects.all())

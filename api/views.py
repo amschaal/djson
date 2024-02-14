@@ -1,8 +1,9 @@
 from rest_framework import viewsets
 from djson.models import ModelType
-from .serializers import ModelTypeSerializer
+from .serializers import ContentTypeSerializer, ModelTypeSerializer
+from django.contrib.contenttypes.models import ContentType
 
-class ModelTypeViewset(viewsets.ReadOnlyModelViewSet):
+class ModelTypeViewset(viewsets.ModelViewSet):
     queryset = ModelType.objects.distinct()
     serializer_class = ModelTypeSerializer
     filterset_fields = {
@@ -13,3 +14,12 @@ class ModelTypeViewset(viewsets.ReadOnlyModelViewSet):
         'description':['icontains']
         }
     search_fields = ('name', 'id')
+
+class ContentTypeViewset(viewsets.ModelViewSet):
+    queryset = ContentType.objects.distinct()
+    serializer_class = ContentTypeSerializer
+    filterset_fields = {
+        'id':['icontains','exact'],
+        'app_label': ['exact'],
+        'model':['exact', 'in']
+        }

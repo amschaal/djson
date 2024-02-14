@@ -8,7 +8,9 @@ class ContentTypeSerializer(serializers.ModelSerializer):
         exclude = []
 
 class ModelTypeSerializer(serializers.ModelSerializer):
-    content_type = ContentTypeSerializer()
+    model = serializers.SerializerMethodField()
+    def get_model(self, instance):
+        return instance.content_type.model if instance and instance.content_type else None
     class Meta:
         model = ModelType
         exclude = []

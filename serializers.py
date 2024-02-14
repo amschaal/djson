@@ -74,7 +74,8 @@ def get_schema_func(validator):
     if validator.instance:
         if hasattr(validator.instance, 'schema') and validator.instance.schema:
             return validator.instance.schema
-        return validator.instance.type.schema
+        if getattr(validator.instance, 'type'):
+            return validator.instance.type.schema
     type_id = validator.serializer.initial_data.get('type')
     if type_id:
         model_type = ModelType.objects.filter(id=type_id).first()
@@ -96,7 +97,7 @@ class DjsonTypeModelSerializer(serializers.ModelSerializer):
         """
         Type should not be changed once set.
         """
-        if self.instance and value != self.instance.type:
+        if self.instance and self.instance.type and value != self.instance.type:
             raise serializers.ValidationError("Types cannot be changed.")
         return value
     # data = JSONSchemaField(schema=TEST_SCHEMA, required=True)

@@ -41,11 +41,13 @@ class JsonSchemaValidator:
         self.field_name = serializer_field.source_attrs[-1]
         self.field = serializer_field
         self.serializer = serializer_field.parent
+        self.schema = self.field.get_schema()
         # Determine the existing instance, if this is an update operation.
-        self.instance = getattr(serializer_field.parent, 'instance', None)
-        if self.get_schema_func:
-            self.schema = self.get_schema_func(self)
-        serializer_field.parent._schema = self.schema
+        # self.instance = getattr(serializer_field.parent, 'instance', None)
+        # if self.get_schema_func:
+        #     self.schema = self.get_schema_func(self)
+        # serializer_field.parent._schema = self.schema
+
 
     def __call__(self, value, serializer_field):
         self.set_context(serializer_field=serializer_field)
@@ -68,15 +70,39 @@ class JSONSchemaField(serializers.JSONField):
         validators = kwargs.pop('validators', [])
         validators.append(JsonSchemaValidator(self.schema, get_schema_func=self.get_schema_func))
         super().__init__(*args, validators=validators, **kwargs)
+    def get_schema(self):
+        if not hasattr(self,'_schema'):
+            if self.schema:
+                self._schema = self.schema
+                return self.schema
+            if self.get_schema_func:
+                self._schema = self.get_schema_func(self)
+        self.parent._schema = self._schema
+        return self._schema
+        
+# def get_schema_func(validator):
+#     # raise Exception('get_schema_func', validator.serializer.initial_data)
+#     if validator.instance:
+#         if hasattr(validator.instance, 'schema') and validator.instance.schema:
+#             return validator.instance.schema
+#         if getattr(validator.instance, 'type'):
+#             return validator.instance.type.schema
+#     type_id = validator.serializer.initial_data.get('type')
+#     if type_id:
+#         model_type = ModelType.objects.filter(id=type_id).first()
+#         if model_type:
+#             return model_type.schema
 
-def get_schema_func(validator):
+def get_schema_func(field):
     # raise Exception('get_schema_func', validator.serializer.initial_data)
-    if validator.instance:
-        if hasattr(validator.instance, 'schema') and validator.instance.schema:
-            return validator.instance.schema
-        if getattr(validator.instance, 'type'):
-            return validator.instance.type.schema
-    type_id = validator.serializer.initial_data.get('type')
+    serializer = field.parent
+    instance = serializer.instance
+    if instance:
+        if hasattr(instance, 'schema') and instance.schema:
+            return instance.schema
+        if getattr(instance, 'type'):
+            return instance.type.schema
+    type_id = serializer.initial_data.get('type')
     if type_id:
         model_type = ModelType.objects.filter(id=type_id).first()
         if model_type:
@@ -88,6 +114,7 @@ class DjsonTypeModelSerializer(serializers.ModelSerializer):
         # raise Exception('wtf', ModelType.objects.all(),  self.fields['type'].choices)
         # raise Exception(self.Meta.model, self.fields['type'].choices)
         super().__init__(instance, **kwargs)
+        # raise Exception('initializing DjsonTypeModelSerializer')
     def to_internal_value(self, data):
         _data = super().to_internal_value(data)
         if getattr(self,'_schema') and (not self.instance or not self.instance.schema):

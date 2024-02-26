@@ -14,6 +14,7 @@ class ModelType(models.Model):
         unique_together = (('content_type', 'name'))
     id = models.CharField(primary_key=True, max_length=30)
     content_type = models.ForeignKey(ContentType, on_delete=models.RESTRICT)
+    # category = models.SlugField(null=True)
     name = models.CharField(max_length=50)
     description = models.TextField()
     schema = models.JSONField(default=dict)

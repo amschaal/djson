@@ -1,6 +1,6 @@
 from rest_framework import viewsets
 from djson.models import ModelType
-from .serializers import ContentTypeSerializer, ModelTypeSerializer
+from djson.serializers import ContentTypeSerializer, ModelTypeSerializer
 from django.contrib.contenttypes.models import ContentType
 
 class ModelTypeViewset(viewsets.ModelViewSet):

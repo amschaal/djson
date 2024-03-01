@@ -17,6 +17,11 @@ class ModelTypeSerializer(serializers.ModelSerializer):
         model = ModelType
         exclude = []
 
+class ModelTypeBasicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ModelType
+        fields = ['id', 'name']
+
 def get_schema_func(field):
     # raise Exception('get_schema_func', validator.serializer.initial_data)
     serializer = field.parent
@@ -27,7 +32,12 @@ def get_schema_func(field):
         if getattr(instance, 'type'):
             return instance.type.schema
     else:
-        type_id = serializer.initial_data.get('type')
+        type = serializer.initial_data.get('type')
+        # Find a cleaner way to do this now that we accept serialized type as input thanks to ModelRelatedField
+        try:
+            type_id = type['id']
+        except:
+            type_id = type
         if type_id:
             model_type = ModelType.objects.filter(id=type_id).first()
             if model_type:
@@ -58,7 +68,7 @@ class DjsonTypeModelSerializer(serializers.ModelSerializer):
     # data = JSONSchemaField(schema=TEST_SCHEMA, required=True)
     # type = serializers.ChoiceField(choices=[])
     # type = serializers.PrimaryKeyRelatedField(queryset=ModelType.objects.all())
-    type = ModelRelatedField(model=ModelType, serializer=ModelTypeSerializer)
+    type = ModelRelatedField(model=ModelType, serializer=ModelTypeBasicSerializer)
     data = JSONSchemaField(required=True, get_schema_func=get_schema_func)
     # def get_type_choices(self):
     #      return [(mt.id, mt.name) for mt in ModelType.objects.filter(content_type=ContentType.objects.get_for_model(self.Meta.model))]

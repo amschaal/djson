@@ -36,6 +36,6 @@ class DjsonModel(DjsonModelBase):
 class DjsonTypeModel(DjsonModel):
     class Meta:
         abstract = True
-    type = models.ForeignKey(ModelType, null=True, on_delete=models.RESTRICT)
+    type = models.ForeignKey(ModelType, null=True, blank=True, on_delete=models.RESTRICT)
     data = models.JSONField(default=dict)
     schema = models.JSONField(default=dict)

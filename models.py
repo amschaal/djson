@@ -18,6 +18,7 @@ class ModelType(models.Model):
     name = models.CharField(max_length=50)
     description = models.TextField()
     schema = models.JSONField(default=dict)
+    metadata = models.JSONField(default=dict) # store other useful information for your app
     @classmethod
     def get_model_queryset(cls, model_class: models.Model):
         return cls.objects.filter(content_type=ContentType.objects.get_for_model(model_class))
@@ -25,13 +26,11 @@ class ModelType(models.Model):
     def get_model_choices(cls, model_class: models.Model):
         return ((mt.id, mt.name) for mt in cls.get_model_queryset(model_class=model_class))
 
-
 class DjsonModel(DjsonModelBase):
     class Meta:
         abstract = True
     data = models.JSONField(default=dict)
     schema = models.JSONField(default=dict)
-
 
 class DjsonTypeModel(DjsonModel):
     class Meta:

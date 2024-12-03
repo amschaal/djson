@@ -38,3 +38,7 @@ class DjsonTypeModel(DjsonModel):
     type = models.ForeignKey(ModelType, null=True, blank=True, on_delete=models.RESTRICT)
     data = models.JSONField(default=dict)
     schema = models.JSONField(default=dict)
+    def save(self, **kwargs):
+        if not self.schema and self.type and self.type.schema:
+            self.schema = self.type.schema
+        return super().save(**kwargs)
